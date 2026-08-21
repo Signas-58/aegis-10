@@ -29,5 +29,7 @@ The bot targets micro-profits (targeting $\ge$ \$0.50 per trade) using Multiplie
 - 🔌 **[Deriv WebSocket API Protocol Reference](file:///c:/Workspace/aegis-10/DERIV_API_DOCS.md)**: JSON payloads, request/response tracking schemas, and endpoints.
 - 🗺️ **[Implementation & Testing Roadmap](file:///c:/Workspace/aegis-10/ROADMAP.md)**: Milestone deliverables from foundation layout to paper testing and live execution.
 - 🖼️ **[Logo Asset](file:///c:/Workspace/aegis-10/logo.jpg)**: Project logo and thumbnail resource.
-- 🖼️ **[Social Preview Card](file:///c:/Workspace/aegis-10/social_preview.png)**: Repository card image for social link sharing.
+- 🖼️ **[Social Preview Card (PNG)](file:///c:/Workspace/aegis-10/social_preview.png)**: Repository card image (PNG).
+- 🖼️ **[Social Preview Card (JPG)](file:///c:/Workspace/aegis-10/social_preview.jpg)**: Repository card image (JPG).
+
 
