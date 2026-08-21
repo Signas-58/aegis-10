@@ -1,0 +1,7 @@
+.env
+__pycache__/
+*.pyc
+active_trade.json
+trading_log.csv
+.vscode/
+.idea/
