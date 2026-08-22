@@ -15,19 +15,20 @@ OTP_REST_ENDPOINT = f"https://api.derivws.com/trading/v1/options/accounts/{DERIV
 
 # Account & Demo Configuration
 IS_DEMO = True  # Hard safety limit
-SYMBOL = "R_10"  # Volatility 10 Index
+SYMBOL = "R_25"  # Switched to Volatility 25 Index for optimal trade speed
 CONTRACT_TYPE_UP = "MULTUP"  # Multipliers Bullish Entry
 CONTRACT_TYPE_DOWN = "MULTDOWN"  # Multipliers Bearish Entry
 MULTIPLIER = 400  # Default Multiplier Factor (Accepts 400, 1000, 2000, 3000, 4000)
 
 # Session & Timeframe Mechanics
-CANDLE_GRANULARITY = 60  # 1-Minute Charting (Minimum granularity supported by Options API v2)
+CANDLE_GRANULARITY = 30  # 30-Second Charting
 
 MAX_RUNTIME_MINUTES = 480  # 8-Hour Maximum Session Limit (Auto-Shutdown)
 COOLDOWN_SECONDS = 30  # 1 Candle Wait Period After Trade Close
 
 # Per-Trade Position & Risk Parameters
-STAKE = 1.00  # Stake amount ($1.00 USD minimum for Multipliers on R_10)
+STAKE = 1.00  # Stake amount ($1.00 USD minimum for Multipliers on R_25)
+
 HARD_STOP_LOSS_USD = 0.75  # Native Deriv Server Stop Loss Limit ($0.75 Max Risk)
 TAKE_PROFIT_USD = None  # UNCAPPED: No fixed TP ceiling
 

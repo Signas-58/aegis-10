@@ -171,8 +171,19 @@ class ScalperBotApp:
         try:
             response = await self.client.send_request(payload)
             if "error" in response:
-                logger.error(f"Failed to fetch historical candles: {response['error'].get('message')}")
-                return False
+                error_msg = response["error"].get("message", "")
+                if "granularity" in error_msg.lower() and config.CANDLE_GRANULARITY == 30:
+                    logger.warning("CANDLE_GRANULARITY = 30 is rejected by Deriv API. Falling back to 60 seconds (1-minute candles) and retrying...")
+                    config.CANDLE_GRANULARITY = 60
+                    payload["granularity"] = 60
+                    response = await self.client.send_request(payload)
+                    if "error" in response:
+                        logger.error(f"Failed to fetch historical candles after fallback: {response['error'].get('message')}")
+                        return False
+                else:
+                    logger.error(f"Failed to fetch historical candles: {error_msg}")
+                    return False
+
             
             history = response.get("candles", [])
             if not history:

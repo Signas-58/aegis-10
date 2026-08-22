@@ -39,7 +39,7 @@ For unified options trading accounts (`DOT` or `ROT` prefix), WebSocket authenti
 - Fetch history and subscribe to live 30-second candle updates:
   ```json
   {
-    "ticks_history": "R_10",
+    "ticks_history": "R_25",
     "adjust_start_time": 1,
     "count": 50,
     "end": "latest",
@@ -62,7 +62,7 @@ For unified options trading accounts (`DOT` or `ROT` prefix), WebSocket authenti
     "contract_type": "MULTUP",
     "currency": "USD",
     "multiplier": 400,
-    "underlying_symbol": "R_10",
+    "underlying_symbol": "R_25",
     "limit_order": {
       "stop_loss": 0.75
     },

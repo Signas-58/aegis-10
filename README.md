@@ -13,7 +13,8 @@
 
 ## Project Overview
 
-**Aegis-10** is an automated algorithmic trading bot designed to scalp low-volatility synthetic indices (`R_10`) via the official Deriv WebSocket API. 
+**Aegis-10** is an automated algorithmic trading bot designed to scalp low-volatility synthetic indices (`R_25`) via the official Deriv WebSocket API. 
+
 
 The bot targets trend-following trade signals using Multiplier contracts, optimized specifically for small account balances ($20.00 initial capital) using native server protection limits, an uncapped dynamic trailing profit ratchet engine, and strict daily risk controls.
 

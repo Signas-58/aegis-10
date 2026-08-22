@@ -44,7 +44,7 @@ aegis-10/
 ## 3. Trading Strategy & Indicator Specifications
 
 ### Market Parameters
-- **Target Instrument**: Volatility 10 Index (`R_10`).
+- **Target Instrument**: Volatility 25 Index (`R_25`).
 - **Contract Type**: Multipliers (`MULTUP` / `MULTDOWN`).
 - **Timeframe**: 30-Second candles (granularity: 30).
 - **Multiplier Factor**: $400\times$.
@@ -71,7 +71,7 @@ On application startup, the bot requests 50 historical 30-second candles via the
 ## 4. Dynamic Risk Management & Circuit Breakers
 
 ### Capital Allocation Controls
-- **Base Stake per Trade**: $1.00 USD (minimum requirement for Multipliers on R_10).
+- **Base Stake per Trade**: $1.00 USD (minimum requirement for Multipliers on R_25).
 - **Hard Stop-Loss (Native Server)**: $0.75 USD.
 - **Take-Profit Ceiling**: Uncapped (None).
 
