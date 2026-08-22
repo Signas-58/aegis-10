@@ -57,7 +57,9 @@ class ScalperBotApp:
 
         # Register callbacks
         self.client.register_subscription("candles", self._on_candle_update)
+        self.client.register_subscription("ohlc", self._on_candle_update)
         self.client.register_subscription("proposal_open_contract", self._on_contract_update)
+
 
         # Start 10-Minute Safety Timer
         asyncio.create_task(self._start_safety_timer())

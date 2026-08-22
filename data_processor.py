@@ -58,28 +58,39 @@ class DataProcessor:
 
     async def handle_candle_stream(self, data: Dict[str, Any]):
         """
-        Processes live candle updates. If the epoch already exists, 
-        overwrites it with the latest data. Otherwise, appends it.
+        Processes live candle updates (ohlc) or historic candles.
+        If the epoch already exists, overwrites it with the latest data.
+        Otherwise, appends it.
         """
-        candle_data = data.get("candle")
-        if not candle_data:
-            # Sometimes history response also triggers this if it's sent under msg_type: candles
-            # But normally stream updates have 'candle' key
-            candle_data = data.get("candles")
-            if isinstance(candle_data, list):
-                # This is history list, ignore it as it's handled in fetch_historical_candles
-                return
+        ohlc_data = data.get("ohlc")
+        if ohlc_data:
+            # Live stream update
+            epoch = int(ohlc_data["open_time"])
+            candle_dict = {
+                "epoch": epoch,
+                "open": float(ohlc_data["open"]),
+                "high": float(ohlc_data["high"]),
+                "low": float(ohlc_data["low"]),
+                "close": float(ohlc_data["close"])
+            }
+        else:
+            # Fallback to legacy candle structure
+            candle_data = data.get("candle")
             if not candle_data:
-                return
+                candle_data = data.get("candles")
+                if isinstance(candle_data, list):
+                    return
+                if not candle_data:
+                    return
+            epoch = int(candle_data["epoch"])
+            candle_dict = {
+                "epoch": epoch,
+                "open": float(candle_data["open"]),
+                "high": float(candle_data["high"]),
+                "low": float(candle_data["low"]),
+                "close": float(candle_data["close"])
+            }
 
-        epoch = int(candle_data["epoch"])
-        candle_dict = {
-            "epoch": epoch,
-            "open": float(candle_data["open"]),
-            "high": float(candle_data["high"]),
-            "low": float(candle_data["low"]),
-            "close": float(candle_data["close"])
-        }
         
         # Check if we already have this candle epoch
         if self.candles and self.candles[-1]["epoch"] == epoch:

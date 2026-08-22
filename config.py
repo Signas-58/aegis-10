@@ -7,7 +7,10 @@ load_dotenv()
 # API Configuration
 DERIV_TOKEN = os.getenv("DERIV_TOKEN", "")
 APP_ID = os.getenv("DERIV_APP_ID", "1089")  # Default app_id
+DERIV_ACCOUNT_ID = os.getenv("DERIV_ACCOUNT_ID", "DOT93113459")  # Default demo DOT account ID
 WS_ENDPOINT = f"wss://ws.derivws.com/websockets/v3?app_id={APP_ID}"
+OTP_REST_ENDPOINT = f"https://api.derivws.com/trading/v1/options/accounts/{DERIV_ACCOUNT_ID}/otp"
+
 
 # Account & Demo Configuration
 IS_DEMO = True  # Hard safety limit

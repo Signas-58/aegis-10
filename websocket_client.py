@@ -3,6 +3,8 @@ import json
 import ssl
 import logging
 import websockets
+import urllib.request
+import urllib.error
 from typing import Dict, Any, Callable, Awaitable
 
 import config
@@ -21,15 +23,64 @@ class DerivWebSocketClient:
         self.is_connected = False
         self.is_authorized = False
 
+    def _get_otp_url_sync(self) -> str:
+        """
+        Calls the REST endpoint to get an authenticated OTP WebSocket URL.
+        """
+        logger.info(f"Requesting trading OTP from REST URL: {config.OTP_REST_ENDPOINT}...")
+        req = urllib.request.Request(
+            config.OTP_REST_ENDPOINT,
+            method="POST",
+            headers={
+                "Authorization": f"Bearer {config.DERIV_TOKEN}",
+                "Deriv-App-ID": config.APP_ID,
+                "Content-Type": "application/json"
+            }
+        )
+        with urllib.request.urlopen(req, data=b"{}") as response:
+            res_data = json.loads(response.read().decode("utf-8"))
+            # Handle nested data structure
+            url = None
+            if "data" in res_data and isinstance(res_data["data"], dict):
+                url = res_data["data"].get("url")
+            if not url and "url" in res_data:
+                url = res_data["url"]
+                
+            if url:
+                return url
+            raise ValueError(f"OTP response did not contain 'url': {res_data}")
+
+
     async def connect(self):
         """
         Connects to the Deriv WebSocket endpoint.
         """
-        logger.info(f"Connecting to Deriv WebSocket at {config.WS_ENDPOINT}...")
+        is_pat_token = config.DERIV_TOKEN.startswith("pat_")
+        is_dot_account = config.DERIV_ACCOUNT_ID.startswith("DOT") or config.DERIV_ACCOUNT_ID.startswith("ROT")
+        
+        ws_url = config.WS_ENDPOINT
+        self.is_authorized = False
+
+        if is_pat_token and is_dot_account:
+            logger.info("New Deriv Options Account detected. Requesting OTP authenticated WebSocket URL...")
+            try:
+                ws_url = await asyncio.to_thread(self._get_otp_url_sync)
+                logger.info("Successfully retrieved OTP WebSocket URL.")
+                self.is_authorized = True
+            except Exception as e:
+                logger.error(f"Failed to fetch OTP WebSocket URL: {e}. Falling back to standard WebSocket connection.")
+
+        logger.info(f"Connecting to Deriv WebSocket at {ws_url}...")
         try:
-            # Deriv requires SSL
+            # Deriv requires SSL and Origin matching the registered App domain
             ssl_context = ssl.create_default_context()
-            self.ws = await websockets.connect(config.WS_ENDPOINT, ssl=ssl_context)
+            self.ws = await websockets.connect(
+                ws_url, 
+                ssl=ssl_context, 
+                origin="https://localhost"
+            )
+
+
             self.is_connected = True
             logger.info("WebSocket connection established.")
             
@@ -99,6 +150,10 @@ class DerivWebSocketClient:
         """
         Authorizes the connection using the DERIV_TOKEN.
         """
+        if self.is_authorized:
+            logger.info("Connection is already authorized via OTP WebSocket URL.")
+            return True
+
         if not config.DERIV_TOKEN:
             logger.error("DERIV_TOKEN is empty. Cannot authorize connection.")
             return False
