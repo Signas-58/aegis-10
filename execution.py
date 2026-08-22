@@ -23,7 +23,8 @@ class ExecutionEngine:
             "contract_type": contract_type,
             "currency": "USD",
             "multiplier": config.MULTIPLIER,
-            "symbol": config.SYMBOL
+            "underlying_symbol": config.SYMBOL
+
         }
         
         try:

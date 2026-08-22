@@ -109,3 +109,5 @@ def check_entry_signal(df: pd.DataFrame) -> Tuple[Optional[str], Optional[float]
         return "MULTDOWN", last_close
 
     return None, None
+
+

@@ -18,8 +18,10 @@ IS_DEMO = True  # Hard safety limit
 # Trading Parameters
 SYMBOL = "R_10"  # Volatility 10 Index
 GRANULARITY = 60  # 1-minute candles
-MULTIPLIER = 100  # Multiplier factor
-DEFAULT_STAKE = 0.35  # Stake per trade ($0.35 to $0.50)
+MULTIPLIER = 400  # Multiplier factor (Accepts 400, 1000, 2000, 3000, 4000)
+
+DEFAULT_STAKE = 1.00  # Stake per trade (minimum $1.00 for multipliers)
+
 
 # Risk Engine Constants
 INITIAL_STOP_LOSS = -2.00  # Hard Stop-Loss cap

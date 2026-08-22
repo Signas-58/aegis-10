@@ -197,6 +197,12 @@ class DerivWebSocketClient:
         except Exception as e:
             logger.error(f"Error in ping heartbeat loop: {e}")
 
+    async def _safe_dispatch_callback(self, msg_type: str, data: Dict[str, Any]):
+        try:
+            await self.subscriptions[msg_type](data)
+        except Exception as callback_err:
+            logger.error(f"Error in stream callback for '{msg_type}': {callback_err}")
+
     async def _read_loop(self):
         """
         Background task reading messages from the WebSocket.
@@ -215,10 +221,7 @@ class DerivWebSocketClient:
                         
                 # 2. Dispatch to stream subscribers
                 if msg_type in self.subscriptions:
-                    try:
-                        await self.subscriptions[msg_type](data)
-                    except Exception as callback_err:
-                        logger.error(f"Error in stream callback for '{msg_type}': {callback_err}")
+                    asyncio.create_task(self._safe_dispatch_callback(msg_type, data))
                         
         except asyncio.CancelledError:
             pass
@@ -230,3 +233,4 @@ class DerivWebSocketClient:
             logger.error(f"Error in read loop: {e}")
             self.is_connected = False
             self.is_authorized = False
+
