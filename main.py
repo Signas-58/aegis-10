@@ -547,6 +547,20 @@ class ScalperBotApp:
             logger.error(f"Failed to load daily statistics from csv log: {e}")
 
 if __name__ == "__main__":
+    # Check if we should relaunch in a new visible Command Prompt window (Windows only)
+    import sys
+    import subprocess
+    import platform
+
+    if platform.system() == "Windows" and (len(sys.argv) == 1 or sys.argv[1] != "--child"):
+        print("Opening dedicated terminal window to display active trade stream...")
+        subprocess.Popen(["cmd.exe", "/k", "python", sys.argv[0], "--child"])
+        sys.exit(0)
+
+    # Slice out the --child flag if present
+    if len(sys.argv) > 1 and sys.argv[1] == "--child":
+        sys.argv.pop(1)
+
     app = ScalperBotApp()
     try:
         asyncio.run(app.run())
@@ -554,3 +568,4 @@ if __name__ == "__main__":
         logger.info("Bot terminated manually via KeyboardInterrupt.")
     except Exception as err:
         logger.error(f"Unhandled runtime exception: {err}")
+
