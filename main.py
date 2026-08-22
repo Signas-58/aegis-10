@@ -554,7 +554,8 @@ if __name__ == "__main__":
 
     if platform.system() == "Windows" and (len(sys.argv) == 1 or sys.argv[1] != "--child"):
         print("Opening dedicated terminal window to display active trade stream...")
-        subprocess.Popen(["cmd.exe", "/k", "python", sys.argv[0], "--child"])
+        subprocess.Popen(["cmd.exe", "/k", "python", sys.argv[0], "--child"], creationflags=subprocess.CREATE_NEW_CONSOLE)
+
         sys.exit(0)
 
     # Slice out the --child flag if present
