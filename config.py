@@ -21,7 +21,8 @@ CONTRACT_TYPE_DOWN = "MULTDOWN"  # Multipliers Bearish Entry
 MULTIPLIER = 400  # Default Multiplier Factor (Accepts 400, 1000, 2000, 3000, 4000)
 
 # Session & Timeframe Mechanics
-CANDLE_GRANULARITY = 30  # 30-Second Charting
+CANDLE_GRANULARITY = 60  # 1-Minute Charting (Minimum granularity supported by Options API v2)
+
 
 MAX_RUNTIME_MINUTES = 480  # 8-Hour Maximum Session Limit (Auto-Shutdown)
 COOLDOWN_SECONDS = 30  # 1 Candle Wait Period After Trade Close
