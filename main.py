@@ -161,23 +161,24 @@ class ScalperBotApp:
         """
         Fetches historical candles for 15m, 5m, and 1m horizons, subscribing to their ticks.
         """
-        # 1. 15m Horizon
-        success_15m = await self._fetch_historical_candles_api(config.TF_MACRO, config.COLD_START_CANDLES, self.candles_15m)
+        # 1. 15m Horizon (Need min 200 for EMA-200, load 250 for smoothing stability)
+        success_15m = await self._fetch_historical_candles_api(config.TF_MACRO, 250, self.candles_15m)
         if not success_15m:
             logger.error("Failed to fetch 15m historical candles.")
             return False
 
         # 2. 5m Horizon
-        success_5m = await self._fetch_historical_candles_api(config.TF_STRUCTURE, config.COLD_START_CANDLES, self.candles_5m)
+        success_5m = await self._fetch_historical_candles_api(config.TF_STRUCTURE, 50, self.candles_5m)
         if not success_5m:
             logger.error("Failed to fetch 5m historical candles.")
             return False
 
         # 3. 1m Horizon
-        success_1m = await self._fetch_historical_candles_api(config.TF_TRIGGER, config.COLD_START_CANDLES, self.candles_1m)
+        success_1m = await self._fetch_historical_candles_api(config.TF_TRIGGER, 50, self.candles_1m)
         if not success_1m:
             logger.error("Failed to fetch 1m historical candles.")
             return False
+
 
         return True
 
