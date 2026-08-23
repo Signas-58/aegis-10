@@ -169,11 +169,12 @@ class ScalperBotApp:
             logger.error("Failed to fetch 15m historical candles.")
             return False
 
-        # 2. 5m Horizon
-        success_5m = await self._fetch_historical_candles_api(config.TF_STRUCTURE, 50, self.candles_5m)
+        # 2. 5m Horizon (Need 55 minimum for rolling baseline calculation, load 100 for safety)
+        success_5m = await self._fetch_historical_candles_api(config.TF_STRUCTURE, 100, self.candles_5m)
         if not success_5m:
             logger.error("Failed to fetch 5m historical candles.")
             return False
+
 
         # 3. 1m Horizon
         success_1m = await self._fetch_historical_candles_api(config.TF_TRIGGER, 50, self.candles_1m)

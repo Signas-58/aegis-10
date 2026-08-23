@@ -136,22 +136,30 @@ def check_entry_signal(
     df_15m: pd.DataFrame, df_5m: pd.DataFrame, df_1m: pd.DataFrame
 ) -> Tuple[Optional[str], Optional[float]]:
     """
-    Evaluates the 5-layer Multi-Timeframe entry logic.
-    Returns (signal_type, current_close_price).
+    Evaluates the Multi-Timeframe entry logic using the Smart Scanner regime
+    classifier and probability scoring engine.
     """
+    import intelligence
+
     df_15m_calc = calculate_15m_indicators(df_15m)
     df_5m_calc = calculate_5m_indicators(df_5m)
     df_1m_calc = calculate_1m_indicators(df_1m)
 
     if (
         df_15m_calc.empty or len(df_15m_calc) < 202
-        or df_5m_calc.empty or len(df_5m_calc) < 16
+        or df_5m_calc.empty or len(df_5m_calc) < 55
         or df_1m_calc.empty or len(df_1m_calc) < 22
     ):
         return None, None
 
-    # Get values at last completed candle (index -2) to prevent repainting
+    # Get regime classification from completed 5m data
+    regime, adx_5m, atr_ratio = intelligence.classify_market_regime(df_5m_calc)
     
+    # Layer 2: Instantly block if REGIME_HIGH_RISK
+    if regime == "REGIME_HIGH_RISK":
+        logger.warning(f"[SMART SCANNER] Halted trading due to REGIME_HIGH_RISK state (ATR ratio: {atr_ratio:.2f})")
+        return None, None
+
     # 1. 15m Macro Trend Gate
     close_15m = df_15m_calc["close"].values[-2]
     ema_15m = df_15m_calc["ema_200"].values[-2]
@@ -161,21 +169,16 @@ def check_entry_signal(
     macro_bullish = close_15m > ema_15m
     macro_bearish = close_15m < ema_15m
 
-    # 2. 5m ADX Trend Strength Filter
-    adx_5m = df_5m_calc["adx_14"].values[-2]
-    if adx_5m < config.ADX_MIN_THRESHOLD:
-        return None, None
-
-    # 3. 15m Support/Resistance Proximity Guard
+    # 3. Proximity Guard Check
     # Use the last completed 1m close price as current execution spot price
     current_price = df_1m_calc["close"].values[-2]
-
-    long_guard_permitted = (htf_resistance - current_price) >= config.PROXIMITY_GUARD_USD
-    short_guard_permitted = (current_price - htf_support) >= config.PROXIMITY_GUARD_USD
+    dist_to_res = htf_resistance - current_price
+    dist_to_supp = current_price - htf_support
+    
+    long_guard_permitted = dist_to_res >= config.PROXIMITY_GUARD_USD
+    short_guard_permitted = dist_to_supp >= config.PROXIMITY_GUARD_USD
 
     # 4. 5m Liquidity Sweep Detection
-    # Determine sweeps on the last 3 completed 5m candles (indices -4, -3, -2)
-    # We pass the htf support/resistance calculated on the 15m level
     highs_5m = df_5m_calc["high"].values
     lows_5m = df_5m_calc["low"].values
     opens_5m = df_5m_calc["open"].values
@@ -190,11 +193,9 @@ def check_entry_signal(
         h = highs_5m[i]
         l = lows_5m[i]
 
-        # Bullish: Low dips below HTF support, but body closes above it
         bull_sweep = l < htf_support and min(o, c) > htf_support
         bullish_sweeps.append(bull_sweep)
 
-        # Bearish: High spikes above HTF resistance, but body closes below it
         bear_sweep = h > htf_resistance and max(o, c) < htf_resistance
         bearish_sweeps.append(bear_sweep)
 
@@ -209,34 +210,56 @@ def check_entry_signal(
     trigger_bullish = close_1m > ema_1m and rsi_1m > 50
     trigger_bearish = close_1m < ema_1m and rsi_1m < 50
 
-    # BULLISH SIGNAL CONFLUENCE
+    # Calculate Setup Confluence Scores
+    score_up = intelligence.calculate_confluence_score(
+        direction="MULTUP",
+        current_price=current_price,
+        macro_ema_200=ema_15m,
+        current_regime=regime,
+        adx_value=adx_5m,
+        active_sweep_detected=bullish_sweep_occurred,
+        distance_to_key_level=dist_to_res,
+        trigger_active=trigger_bullish
+    )
+
+    score_down = intelligence.calculate_confluence_score(
+        direction="MULTDOWN",
+        current_price=current_price,
+        macro_ema_200=ema_15m,
+        current_regime=regime,
+        adx_value=adx_5m,
+        active_sweep_detected=bearish_sweep_occurred,
+        distance_to_key_level=dist_to_supp,
+        trigger_active=trigger_bearish
+    )
+
+    # Evaluate LONG MULTUP Signal
     if (
-        macro_bullish
-        and long_guard_permitted
-        and trigger_bullish
-        and (bullish_sweep_occurred or macro_bullish)
+        macro_bullish 
+        and long_guard_permitted 
+        and trigger_bullish 
+        and score_up >= 75
     ):
+        confidence_str = "HIGH" if score_up >= 85 else "MEDIUM"
         logger.info(
-            f"[SIGNAL] MULTUP. Price: {current_price:.2f}, ADX: {adx_5m:.2f}, "
-            f"15m Res: {htf_resistance:.2f} (Dist: {htf_resistance - current_price:.2f}), "
-            f"Sweep: {bullish_sweep_occurred}, Trigger: {trigger_bullish}"
+            f"[SMART SCANNER] Signal: MULTUP | Score: {score_up}% | "
+            f"Regime: {regime} | Confidence: {confidence_str} | Price: {current_price:.2f}"
         )
         return "MULTUP", current_price
 
-    # BEARISH SIGNAL CONFLUENCE
+    # Evaluate SHORT MULTDOWN Signal
     if (
-        macro_bearish
-        and short_guard_permitted
-        and trigger_bearish
-        and (bearish_sweep_occurred or macro_bearish)
+        macro_bearish 
+        and short_guard_permitted 
+        and trigger_bearish 
+        and score_down >= 75
     ):
+        confidence_str = "HIGH" if score_down >= 85 else "MEDIUM"
         logger.info(
-            f"[SIGNAL] MULTDOWN. Price: {current_price:.2f}, ADX: {adx_5m:.2f}, "
-            f"15m Supp: {htf_support:.2f} (Dist: {current_price - htf_support:.2f}), "
-            f"Sweep: {bearish_sweep_occurred}, Trigger: {trigger_bearish}"
+            f"[SMART SCANNER] Signal: MULTDOWN | Score: {score_down}% | "
+            f"Regime: {regime} | Confidence: {confidence_str} | Price: {current_price:.2f}"
         )
         return "MULTDOWN", current_price
 
-
-
     return None, None
+

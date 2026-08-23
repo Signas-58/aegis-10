@@ -42,29 +42,22 @@ The bot maintains three historical candle buffers for `R_25`:
 2. **Structure Buffer (5m)**: minimum 50 candles for ADX-14 calculation and sweep detection.
 3. **Trigger Buffer (1m)**: minimum 50 candles for precision EMA-20 / RSI-14 entry signals.
 
-### 5-Layer Confluence Engine (`strat.py`)
+### Smart Scanning & regime Classification (`intelligence.py`)
+To prevent over-trading in sideways chop or extreme chaotic volatility, the bot calculates 14-period ATR ratio and ADX slope on 5m candles to classify the market state:
+- **`REGIME_HIGH_RISK`**: ATR ratio > 1.8 (Extreme volatility spikes). *Rule*: Pauses execution instantly, returning `NO_SIGNAL`.
+- **`REGIME_TRENDING`**: 5m ADX >= 20 and ADX slope > 0. (Ideal conditions).
+- **`REGIME_CONSOLIDATING`**: 5m ADX < 20 and ATR ratio <= 1.0. (Sideways market).
+- **`REGIME_NORMAL`**: Default fallback state.
 
-A signal must sequentially pass all five logic layers to trigger entry:
+### 100-Point Confluence Scoring Matrix
+A trade setup is evaluated across 4 weighted vectors to calculate a dynamic probability score (0 to 100%):
+1. **Vector 1: Macro Trend Alignment (25 Points)**: Price aligns with the 15m EMA-200.
+2. **Vector 2: Volatility & Regime Quality (25 Points)**: Setup occurs in `REGIME_TRENDING` (25 pts), or in `REGIME_CONSOLIDATING` with ADX >= 18 (15 pts).
+3. **Vector 3: Liquidity & Key Level Setup (25 Points)**: Active 5m liquidity sweep detected (25 pts), or distance to HTF key level >= 1.00 USD (15 pts).
+4. **Vector 4: Trigger Momentum Precision (25 Points)**: 1m trigger candle crossover meets indicators (EMA-20 and RSI-14 vs 50).
 
-1. **Layer 1: 15m Trend Gate**:
-   - Calculates EMA-200 on 15m candles.
-   - Bullish: 15m Close > 15m EMA-200 (Allows `MULTUP` entries only).
-   - Bearish: 15m Close < 15m EMA-200 (Allows `MULTDOWN` entries only).
-2. **Layer 2: 5m ADX Volatility Filter**:
-   - Calculates 14-period ADX on 5m candles.
-   - Halt Rule: Blocks signal if `ADX < 18` to catch early trend momentum.
-3. **Layer 3: 15m Key Level Mapping & Proximity Guard**:
-   - Maps `HTF_RESISTANCE` (highest high of last 20 15m candles) and `HTF_SUPPORT` (lowest low of last 20 15m candles).
-   - Proximity Rule:
-     - Block LONG if `HTF_RESISTANCE - Current_Price < 0.25 USD`.
-     - Block SHORT if `Current_Price - HTF_SUPPORT < 0.25 USD`.
-4. **Layer 4: 5m Liquidity Sweep Detection**:
-   - *Bullish Sweep*: 5m candle wick dips below `HTF_SUPPORT` but body closes above it (Sell-side liquidity grab). Sets 5m bias to bullish.
-   - *Bearish Sweep*: 5m candle wick spikes above `HTF_RESISTANCE` but body closes below it (Buy-side liquidity grab). Sets 5m bias to bearish.
-5. **Layer 5: Trigger Confluence**:
-   - Evaluated at the start of a new 1-minute candle:
-     - `MULTUP` (Long): `15m_Macro_Bullish` AND `5m_ADX >= 18` AND `Proximity_Guard_Pass` AND `1m_Trigger == True` (Mandatory) AND (`5m_Sweep == True` OR `15m_Trend_Strong`).
-     - `MULTDOWN` (Short): `15m_Macro_Bearish` AND `5m_ADX >= 18` AND `Proximity_Guard_Pass` AND `1m_Trigger == True` (Mandatory) AND (`5m_Sweep == True` OR `15m_Trend_Strong`).
+*Execution Rule*: A trade executes only if `total_score >= 75` and the 1m trigger crossover is **MANDATORY** (`Trigger == True`).
+
 
 ---
 
