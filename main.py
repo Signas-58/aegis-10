@@ -13,6 +13,7 @@ import pandas as pd
 import config
 from websocket_client import DerivWebSocketClient
 import engine
+import strat
 
 # Configure logging
 logging.basicConfig(
@@ -29,8 +30,12 @@ class ScalperBotApp:
         self.client = DerivWebSocketClient()
         self.ratchet_engine = engine.TrailingRatchetEngine()
         
+        # Multi-Timeframe Buffers
+        self.candles_15m: List[Dict[str, Any]] = []
+        self.candles_5m: List[Dict[str, Any]] = []
+        self.candles_1m: List[Dict[str, Any]] = []
+
         # State tracking
-        self.candles: List[Dict[str, Any]] = []
         self.active_trade: Optional[Dict[str, Any]] = None
         self.consecutive_losses = 0
         self.cumulative_daily_loss = 0.0
@@ -83,8 +88,8 @@ class ScalperBotApp:
         # Start Safety Session Timer (MAX_RUNTIME_MINUTES)
         asyncio.create_task(self._start_safety_timer())
 
-        # Always fetch historical candles & initiate subscription on startup
-        success = await self._fetch_historical_candles_api()
+        # Always fetch historical candles & initiate subscriptions on startup
+        success = await self._fetch_historical_candles_all()
         if not success:
             logger.error("Failed to fetch historical candles. Terminating.")
             self.running = False
@@ -102,7 +107,6 @@ class ScalperBotApp:
                 logger.error("Could not subscribe to recovered contract. Clearing state to resume normal trading.")
                 self._clear_active_trade_state()
                 self.active_trade = None
-
 
         # Main execution keepalive loop
         try:
@@ -153,46 +157,59 @@ class ScalperBotApp:
             logger.warning("Active trade is currently open. Shutdown pending after trade completes.")
             self.shutdown_pending = True
 
-    async def _fetch_historical_candles_api(self) -> bool:
+    async def _fetch_historical_candles_all(self) -> bool:
         """
-        Fetches historical cold-start candles (50 count) and subscribes to subsequent candles.
+        Fetches historical candles for 15m, 5m, and 1m horizons, subscribing to their ticks.
         """
-        logger.info(f"Fetching {config.COLD_START_CANDLES} historical candles (granularity: {config.CANDLE_GRANULARITY}s) for {config.SYMBOL}...")
+        # 1. 15m Horizon
+        success_15m = await self._fetch_historical_candles_api(config.TF_MACRO, config.COLD_START_CANDLES, self.candles_15m)
+        if not success_15m:
+            logger.error("Failed to fetch 15m historical candles.")
+            return False
+
+        # 2. 5m Horizon
+        success_5m = await self._fetch_historical_candles_api(config.TF_STRUCTURE, config.COLD_START_CANDLES, self.candles_5m)
+        if not success_5m:
+            logger.error("Failed to fetch 5m historical candles.")
+            return False
+
+        # 3. 1m Horizon
+        success_1m = await self._fetch_historical_candles_api(config.TF_TRIGGER, config.COLD_START_CANDLES, self.candles_1m)
+        if not success_1m:
+            logger.error("Failed to fetch 1m historical candles.")
+            return False
+
+        return True
+
+    async def _fetch_historical_candles_api(self, granularity: int, count: int, buffer: List[Dict[str, Any]]) -> bool:
+        """
+        Fetches historical candles and subscribes to subsequent ticks.
+        """
+        logger.info(f"Fetching {count} historical candles (granularity: {granularity}s) for {config.SYMBOL}...")
         payload = {
             "ticks_history": config.SYMBOL,
             "adjust_start_time": 1,
-            "count": config.COLD_START_CANDLES,
+            "count": count,
             "end": "latest",
             "style": "candles",
-            "granularity": config.CANDLE_GRANULARITY,
+            "granularity": granularity,
             "subscribe": 1
         }
         
         try:
             response = await self.client.send_request(payload)
             if "error" in response:
-                error_msg = response["error"].get("message", "")
-                if "granularity" in error_msg.lower() and config.CANDLE_GRANULARITY == 30:
-                    logger.warning("CANDLE_GRANULARITY = 30 is rejected by Deriv API. Falling back to 60 seconds (1-minute candles) and retrying...")
-                    config.CANDLE_GRANULARITY = 60
-                    payload["granularity"] = 60
-                    response = await self.client.send_request(payload)
-                    if "error" in response:
-                        logger.error(f"Failed to fetch historical candles after fallback: {response['error'].get('message')}")
-                        return False
-                else:
-                    logger.error(f"Failed to fetch historical candles: {error_msg}")
-                    return False
-
+                logger.error(f"Failed to fetch historical candles for granularity {granularity}: {response['error'].get('message')}")
+                return False
             
             history = response.get("candles", [])
             if not history:
-                logger.warning("No historical candles returned from API.")
+                logger.warning(f"No historical candles returned for granularity {granularity}.")
                 return False
             
-            self.candles = []
+            buffer.clear()
             for candle in history:
-                self.candles.append({
+                buffer.append({
                     "epoch": int(candle["epoch"]),
                     "open": float(candle["open"]),
                     "high": float(candle["high"]),
@@ -200,15 +217,16 @@ class ScalperBotApp:
                     "close": float(candle["close"])
                 })
             
-            logger.info(f"Successfully loaded {len(self.candles)} historical candles.")
+            logger.info(f"Successfully loaded {len(buffer)} historical candles for granularity {granularity}s.")
             return True
         except Exception as e:
-            logger.error(f"Error fetching historical candles: {e}")
+            logger.error(f"Error fetching historical candles for granularity {granularity}: {e}")
             return False
 
     async def _on_candle_stream(self, data: dict):
         """
         Triggered when a candle update is received from the subscription stream.
+        Routes ticks to 15m, 5m, or 1m buffers based on granularity.
         """
         if self.session_expired and not self.active_trade:
             self.running = False
@@ -216,6 +234,7 @@ class ScalperBotApp:
 
         ohlc_data = data.get("ohlc")
         if ohlc_data:
+            granularity = int(ohlc_data.get("granularity", 0))
             epoch = int(ohlc_data["open_time"])
             candle_dict = {
                 "epoch": epoch,
@@ -225,6 +244,9 @@ class ScalperBotApp:
                 "close": float(ohlc_data["close"])
             }
         else:
+            echo_req = data.get("echo_req") or {}
+            granularity = int(echo_req.get("granularity", 0))
+            
             candle_data = data.get("candle") or data.get("candles")
             if isinstance(candle_data, list) or not candle_data:
                 return
@@ -237,36 +259,52 @@ class ScalperBotApp:
                 "close": float(candle_data["close"])
             }
 
+        if granularity not in [config.TF_MACRO, config.TF_STRUCTURE, config.TF_TRIGGER]:
+            return
+
+        # Route to appropriate buffer
+        if granularity == config.TF_MACRO:
+            buffer = self.candles_15m
+            limit = 300
+            name = "15m"
+        elif granularity == config.TF_STRUCTURE:
+            buffer = self.candles_5m
+            limit = 100
+            name = "5m"
+        else:
+            buffer = self.candles_1m
+            limit = 100
+            name = "1m"
+
         # Check if we already have this candle epoch
         new_candle_started = False
-        if self.candles and self.candles[-1]["epoch"] == epoch:
-            self.candles[-1] = candle_dict
+        if buffer and buffer[-1]["epoch"] == epoch:
+            buffer[-1] = candle_dict
         else:
-            # A new candle has started!
-            if self.candles:
+            if buffer:
                 new_candle_started = True
-            self.candles.append(candle_dict)
-            logger.info(f"New {config.CANDLE_GRANULARITY}-Second candle started. Epoch: {epoch}, Close: {candle_dict['close']}")
+            buffer.append(candle_dict)
+            if new_candle_started and name == "1m":
+                logger.info(f"New 1m candle started. Epoch: {epoch}, Close: {candle_dict['close']}")
 
-        # Limit size to last 100 candles
-        if len(self.candles) > 100:
-            self.candles = self.candles[-100:]
+        # Truncate buffer size
+        if len(buffer) > limit:
+            buffer[:] = buffer[-limit:]
 
-        # Strategy evaluation only happens:
-        # 1. At the close/start of a new completed candle.
-        # 2. If no trade is open.
-        # 3. If session is not expired or pending shutdown.
-        # 4. If cooldown period has ended.
-        if (new_candle_started and not self.active_trade 
+        # Evaluate strategy signal at the close/start of a new completed 1-minute candle
+        if (new_candle_started and name == "1m" and not self.active_trade 
                 and not self.session_expired and not self.shutdown_pending):
             
-            # Check cooldown timer
+            # Check cooldown / quarantine timer
             current_time = time.time()
             if current_time < self.cooldown_until:
                 return
 
-            df = self._get_candles_df()
-            signal, entry_price = engine.check_entry_signal(df)
+            df_15m = self._get_candles_df(self.candles_15m)
+            df_5m = self._get_candles_df(self.candles_5m)
+            df_1m = self._get_candles_df(self.candles_1m)
+
+            signal, entry_price = strat.check_entry_signal(df_15m, df_5m, df_1m)
             
             if signal:
                 logger.info(f"Signal detected: {signal} at {entry_price}. Preparing execution...")
@@ -365,10 +403,6 @@ class ScalperBotApp:
             self._clear_active_trade_state()
             self.active_trade = None
 
-            # Cooldown implementation (30 seconds)
-            self.cooldown_until = time.time() + config.COOLDOWN_SECONDS
-            logger.info(f"Cooldown active for {config.COOLDOWN_SECONDS} seconds before new signals can be scanned.")
-
             # Check circuit breaker halts
             if self._check_circuit_breakers():
                 return
@@ -432,17 +466,20 @@ class ScalperBotApp:
 
     def _process_trade_outcome(self, contract_id: str, final_pnl: float):
         """
-        Logs trade details and tracks daily cumulative metrics.
+        Logs trade details and enforces post-trade win/loss quarantine cooldown rules.
         """
-        # Determine win/loss logic
         is_win = final_pnl > 0
         
         if is_win:
             self.consecutive_losses = 0
             self.cumulative_daily_loss -= final_pnl  # Subtract net profit from daily loss tracking
+            self.cooldown_until = time.time() + config.COOLDOWN_AFTER_WIN_SECONDS
+            logger.info(f"Trade won! Win cooldown active for {config.COOLDOWN_AFTER_WIN_SECONDS}s.")
         else:
             self.consecutive_losses += 1
             self.cumulative_daily_loss += abs(final_pnl)  # Add loss amount to tracking
+            self.cooldown_until = time.time() + config.COOLDOWN_AFTER_LOSS_SECONDS
+            logger.warning(f"Trade lost. Enforcing 10-Minute Loss Quarantine ({config.COOLDOWN_AFTER_LOSS_SECONDS}s cooldown).")
 
         # Log to CSV
         log_file = "trading_log.csv"
@@ -484,13 +521,13 @@ class ScalperBotApp:
 
         return False
 
-    def _get_candles_df(self) -> pd.DataFrame:
+    def _get_candles_df(self, candles_list: List[Dict[str, Any]]) -> pd.DataFrame:
         """
         Helper returning candle data formatted as a pandas DataFrame.
         """
-        if not self.candles:
+        if not candles_list:
             return pd.DataFrame(columns=["epoch", "open", "high", "low", "close"])
-        df = pd.DataFrame(self.candles)
+        df = pd.DataFrame(candles_list)
         for col in ["open", "high", "low", "close"]:
             df[col] = df[col].astype(float)
         df["epoch"] = df["epoch"].astype(int)
@@ -540,7 +577,6 @@ class ScalperBotApp:
                 reader = list(csv.DictReader(f))
                 if not reader:
                     return
-                # Retrieve parameters from the very last logged trade row
                 last_row = reader[-1]
                 
                 # Verify if the trade was within the same day
@@ -550,7 +586,6 @@ class ScalperBotApp:
                     trade_date = datetime.strptime(clean_timestamp, "%Y-%m-%d %H:%M:%S").date()
                     today = datetime.now().date()
                     if trade_date == today:
-
                         self.consecutive_losses = int(last_row.get("consecutive_losses", 0))
                         self.cumulative_daily_loss = float(last_row.get("cumulative_daily_loss", 0.0))
                         logger.info(f"Restored daily statistics: Consecutive Losses: {self.consecutive_losses}, Cumulative Loss: ${self.cumulative_daily_loss:.2f}")
@@ -566,7 +601,6 @@ if __name__ == "__main__":
     if platform.system() == "Windows" and (len(sys.argv) == 1 or sys.argv[1] != "--child"):
         print("Opening dedicated terminal window to display active trade stream...")
         subprocess.Popen(["cmd.exe", "/k", "python", sys.argv[0], "--child"], creationflags=subprocess.CREATE_NEW_CONSOLE)
-
         sys.exit(0)
 
     # Slice out the --child flag if present
@@ -580,4 +614,3 @@ if __name__ == "__main__":
         logger.info("Bot terminated manually via KeyboardInterrupt.")
     except Exception as err:
         logger.error(f"Unhandled runtime exception: {err}")
-
