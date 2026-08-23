@@ -25,12 +25,13 @@ The bot executes a top-down Multi-Timeframe (15m / 5m / 1m) Smart Money & Liquid
   - *Macro Buffer (15m)*: Used for trend direction gates and swing high/low key level mappings.
   - *Structure Buffer (5m)*: Used for ADX trend strength filtering and liquidity sweep detection.
   - *Trigger Buffer (1m)*: Precision entry execution signals.
-- **Top-Down 5-Layer Confluence Engine**:
-  1. **EMA Trend Gate (15m)**: Calculates EMA-200 to enforce macro trend direction (`MULTUP` / `MULTDOWN`).
-  2. **ADX Volatility Gate (5m)**: Calculated over a 14-period window. Blocks all execution if `ADX < 18` to catch early trend momentum.
-  3. **Proximity Guard (15m)**: Blocks entries if current spot price is within `$0.25 USD` of HTF support/resistance levels.
-  4. **Liquidity Sweep Detection (5m)**: Detects sell-side/buy-side liquidity sweeps when candles wick past HTF support/resistance but close back inside the range.
-  5. **Precision Entry Trigger (1m)**: Enforces entry when the 1m price crosses EMA-20 with RSI-14 > 50, OR when a corresponding 5m liquidity sweep is active.
+- **Smart Scanning & Regime Classifier**:
+  - Calculates 14-period ATR ratio and ADX slope on 5m candles to classify market regimes: `REGIME_TRENDING`, `REGIME_CONSOLIDATING`, or `REGIME_HIGH_RISK`.
+  - **High-Risk Safety Switch**: Halts scan instantly under `REGIME_HIGH_RISK` (ATR ratio > 1.8) to prevent trading during chaotic market noise.
+- **100-Point Confluence Scoring Matrix**:
+  - Dynamically evaluates setups across 4 weighted vectors: Macro Trend (25 pts), Volatility/Regime Quality (25 pts), Liquidity sweeps/key levels (25 pts), and Precision Trigger momentum (25 pts).
+  - Trade executes only if `total_score >= 75` and the 1m trigger crossover is `True` (Mandatory).
+
 
 - **Dynamic Ratchet Trailing Engine**:
   - *Phase 1 (Stepped Floor under $1.00)*:
@@ -43,7 +44,8 @@ The bot executes a top-down Multi-Timeframe (15m / 5m / 1m) Smart Money & Liquid
 
 - **System Circuit Breakers & Cooldowns**:
   - Standard Win Cooldown: Standard 30-second pause after winning trade.
-  - **3-Minute Loss Quarantine (`180s`)**: Active immediately after any losing trade to let hostile market conditions clear.
+  - **10-Minute Loss Quarantine (`600s`)**: Active immediately after any losing trade to let hostile market conditions clear.
+
 
   - Max limits: Emergency halt on 4 consecutive losses or `$3.00` daily cap.
   - Session Limit: Max 8 hours runtime countdown (`MAX_RUNTIME_MINUTES = 480`).
