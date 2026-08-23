@@ -24,8 +24,9 @@ TF_TRIGGER = 60  # 1-Minute Candles (Precision Trigger Horizon)
 
 # Strategy & Filter Thresholds
 EMA_MACRO_PERIOD = 200  # 15m Trend Direction Gate
-ADX_MIN_THRESHOLD = 22  # Minimum 5m ADX required to trade (Blocks chop)
-PROXIMITY_GUARD_USD = 0.50  # Minimum distance required from 15m Support/Resistance
+ADX_MIN_THRESHOLD = 18  # Lowered from 22 to catch early trend momentum
+PROXIMITY_GUARD_USD = 0.25  # Lowered from $0.50 to reduce unnecessary entry blocks
+
 
 # Position & Trailing Execution Specs
 STAKE = 1.00  # Deriv Multipliers API minimum requirement
@@ -38,8 +39,9 @@ TRAILING_OFFSET_USD = 0.50  # SL floor trails $0.50 behind peak PnL
 
 # Safety Cooldowns & Circuit Breakers
 COOLDOWN_AFTER_WIN_SECONDS = 30  # Standard 1-candle wait after winning trade
-COOLDOWN_AFTER_LOSS_SECONDS = 600  # 10-Minute Loss Quarantine (Settles bad market state)
+COOLDOWN_AFTER_LOSS_SECONDS = 180  # Reduced to 3 minutes for faster market re-entry
 MAX_CONSECUTIVE_LOSSES = 4  # Emergency halt after 4 consecutive losses
+
 MAX_DAILY_LOSS_USD = 3.00  # Emergency halt on $3.00 total session loss
 MAX_RUNTIME_MINUTES = 480  # 8-Hour Session Time Limit
 

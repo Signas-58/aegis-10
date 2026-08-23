@@ -52,20 +52,19 @@ A signal must sequentially pass all five logic layers to trigger entry:
    - Bearish: 15m Close < 15m EMA-200 (Allows `MULTDOWN` entries only).
 2. **Layer 2: 5m ADX Volatility Filter**:
    - Calculates 14-period ADX on 5m candles.
-   - Halt Rule: Blocks signal if `ADX < 22` to avoid choppy sideways markets.
+   - Halt Rule: Blocks signal if `ADX < 18` to catch early trend momentum.
 3. **Layer 3: 15m Key Level Mapping & Proximity Guard**:
    - Maps `HTF_RESISTANCE` (highest high of last 20 15m candles) and `HTF_SUPPORT` (lowest low of last 20 15m candles).
    - Proximity Rule:
-     - Block LONG if `HTF_RESISTANCE - Current_Price < 0.50 USD`.
-     - Block SHORT if `Current_Price - HTF_SUPPORT < 0.50 USD`.
+     - Block LONG if `HTF_RESISTANCE - Current_Price < 0.25 USD`.
+     - Block SHORT if `Current_Price - HTF_SUPPORT < 0.25 USD`.
 4. **Layer 4: 5m Liquidity Sweep Detection**:
    - *Bullish Sweep*: 5m candle wick dips below `HTF_SUPPORT` but body closes above it (Sell-side liquidity grab). Sets 5m bias to bullish.
    - *Bearish Sweep*: 5m candle wick spikes above `HTF_RESISTANCE` but body closes below it (Buy-side liquidity grab). Sets 5m bias to bearish.
-   - Signal Rule: Requires 15m macro trend alignment OR a corresponding liquidity sweep in the last three 5m candles.
-5. **Layer 5: 1m Precision Entry**:
+5. **Layer 5: Trigger Confluence**:
    - Evaluated at the start of a new 1-minute candle:
-     - `MULTUP` (Long): 1m Close > 1m EMA-20 AND 1m RSI-14 > 50.
-     - `MULTDOWN` (Short): 1m Close < 1m EMA-20 AND 1m RSI-14 < 50.
+     - `MULTUP` (Long): `(1m Close > 1m EMA-20 AND 1m RSI-14 > 50) OR (5m Bullish Liquidity Sweep active)`.
+     - `MULTDOWN` (Short): `(1m Close < 1m EMA-20 AND 1m RSI-14 < 50) OR (5m Bearish Liquidity Sweep active)`.
 
 ---
 
@@ -87,6 +86,7 @@ A signal must sequentially pass all five logic layers to trigger entry:
 - **Consecutive Loss Stop**: Terminate program if consecutive losses reach `4`.
 - **Post-Trade Reset & Quarantine**:
   - *Win Cooldown*: Standard 30-second pause after winning trade.
-  - *Loss Quarantine*: Enforce a **10-minute loss quarantine** (`600s`) after any losing trade to allow adverse market structures to clear.
+  - *Loss Quarantine*: Enforce a **3-minute loss quarantine** (`180s`) after any losing trade to allow adverse market structures to clear.
+
 - **8-Hour Session Timer (`MAX_RUNTIME_MINUTES = 480`)**:
   - The bot automatically shuts down after 8 hours of session runtime. If a trade is open, it halts new signal scanning and waits to close the position cleanly before exiting.

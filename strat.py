@@ -213,13 +213,12 @@ def check_entry_signal(
     if (
         macro_bullish
         and long_guard_permitted
-        and (macro_bullish or bullish_sweep_occurred)
-        and trigger_bullish
+        and (trigger_bullish or bullish_sweep_occurred)
     ):
         logger.info(
             f"[SIGNAL] MULTUP. Price: {current_price:.2f}, ADX: {adx_5m:.2f}, "
             f"15m Res: {htf_resistance:.2f} (Dist: {htf_resistance - current_price:.2f}), "
-            f"Sweep: {bullish_sweep_occurred}, 1m RSI: {rsi_1m:.2f}"
+            f"Sweep: {bullish_sweep_occurred}, Trigger: {trigger_bullish}"
         )
         return "MULTUP", current_price
 
@@ -227,14 +226,14 @@ def check_entry_signal(
     if (
         macro_bearish
         and short_guard_permitted
-        and (macro_bearish or bearish_sweep_occurred)
-        and trigger_bearish
+        and (trigger_bearish or bearish_sweep_occurred)
     ):
         logger.info(
             f"[SIGNAL] MULTDOWN. Price: {current_price:.2f}, ADX: {adx_5m:.2f}, "
             f"15m Supp: {htf_support:.2f} (Dist: {current_price - htf_support:.2f}), "
-            f"Sweep: {bearish_sweep_occurred}, 1m RSI: {rsi_1m:.2f}"
+            f"Sweep: {bearish_sweep_occurred}, Trigger: {trigger_bearish}"
         )
         return "MULTDOWN", current_price
+
 
     return None, None
