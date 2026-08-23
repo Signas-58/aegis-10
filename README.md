@@ -59,6 +59,7 @@ aegis-10/
 ├── config.py             # System parameters & risk thresholds
 ├── main.py               # Orchestrator, connection handlers, and trade state recovery
 ├── strat.py              # Technical indicators & multi-timeframe signal filters
+├── intelligence.py       # Smart scanner regime classifier & probability scorer
 ├── engine.py             # Trailing stop ratchet calculator
 ├── websocket_client.py   # OTP WebSocket connection handshake client
 ├── active_trade.json     # Dynamic crash recovery state persistence
@@ -87,3 +88,11 @@ aegis-10/
    *Windows Feature: Running python main.py automatically pops open a new Command Prompt window displaying the trade stream, exiting the background console cleanly.*
 4. **Graceful Shutdown**:
    Press **`Ctrl + C`** in your visible Command Prompt window at any time. The bot will automatically execute a market close order on any open trade before disconnecting and exiting.
+
+---
+
+## Repository Documentation
+
+- 📘 **[Project Design & Technical Plan](file:///c:/Workspace/aegis-10/PROJECT_DESIGN_DOC.md)**: Detailed specifications, system architecture, strategy logic, and risk controls.
+- 🔌 **[Deriv WebSocket API Protocol Reference](file:///c:/Workspace/aegis-10/DERIV_API_DOCS.md)**: JSON payloads, request/response tracking schemas, and endpoints.
+
