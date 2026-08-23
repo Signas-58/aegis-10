@@ -63,8 +63,8 @@ A signal must sequentially pass all five logic layers to trigger entry:
    - *Bearish Sweep*: 5m candle wick spikes above `HTF_RESISTANCE` but body closes below it (Buy-side liquidity grab). Sets 5m bias to bearish.
 5. **Layer 5: Trigger Confluence**:
    - Evaluated at the start of a new 1-minute candle:
-     - `MULTUP` (Long): `(1m Close > 1m EMA-20 AND 1m RSI-14 > 50) OR (5m Bullish Liquidity Sweep active)`.
-     - `MULTDOWN` (Short): `(1m Close < 1m EMA-20 AND 1m RSI-14 < 50) OR (5m Bearish Liquidity Sweep active)`.
+     - `MULTUP` (Long): `15m_Macro_Bullish` AND `5m_ADX >= 18` AND `Proximity_Guard_Pass` AND `1m_Trigger == True` (Mandatory) AND (`5m_Sweep == True` OR `15m_Trend_Strong`).
+     - `MULTDOWN` (Short): `15m_Macro_Bearish` AND `5m_ADX >= 18` AND `Proximity_Guard_Pass` AND `1m_Trigger == True` (Mandatory) AND (`5m_Sweep == True` OR `15m_Trend_Strong`).
 
 ---
 
@@ -82,18 +82,16 @@ A signal must sequentially pass all five logic layers to trigger entry:
   - Shift floor to `+$0.25` once peak PnL reaches `+$0.75` (Locks in $0.25 profit).
 - **Stage 2 (Continuous Trailing Phase)**:
   - Once peak PnL reaches `+$1.00` or above, the stop-loss floor trails exactly `-$0.50` behind peak PnL (e.g. `peak_pnl - 0.50` on a continuous cent-by-cent basis).
-- **Execution**: Issue immediate market close command if PnL drops to or below the current stop-loss floor.
+- **Execution & Server SL Isolation**: If `current_sl_floor < 0.00` (initial Stage 0 setup), the bot does NOT send manual WebSocket sell commands, allowing Deriv's native server-side SL to trigger. Manual Python WebSocket sell commands are strictly isolated to Stage 1 and Stage 2 (`current_sl_floor >= 0.00`). If a sell request returns `"The contract has expired"` or the POC response flags `is_expired`/`is_sold`, the bot immediately concludes the trade cleanly.
 - **Server-Side Sync Safeguard**: To prevent losses due to connection dropout or bot latency, the bot syncs the updated stop-loss limits to the Deriv servers in real time using the `contract_update` API. For profit-locking levels (where positive stops are rejected by the API), the server stop-loss is set to `$0.10` (the minimum limit supported by the Deriv API) to guarantee near-break-even protection.
-
-
-
 
 ### System Circuit Breakers
 - **Daily Drawdown Cap**: Terminate program if total cumulative daily loss reaches `$3.00 USD`.
 - **Consecutive Loss Stop**: Terminate program if consecutive losses reach `4`.
 - **Post-Trade Reset & Quarantine**:
   - *Win Cooldown*: Standard 30-second pause after winning trade.
-  - *Loss Quarantine*: Enforce a **3-minute loss quarantine** (`180s`) after any losing trade to allow adverse market structures to clear.
+  - *Loss Quarantine*: Enforce a **10-minute loss quarantine** (`600s`) after any losing trade to allow adverse market structures to clear.
+
 
 - **8-Hour Session Timer (`MAX_RUNTIME_MINUTES = 480`)**:
   - The bot automatically shuts down after 8 hours of session runtime. If a trade is open, it halts new signal scanning and waits to close the position cleanly before exiting.

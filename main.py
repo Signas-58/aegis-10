@@ -394,12 +394,13 @@ class ScalperBotApp:
 
         current_pnl = float(open_contract.get("profit", 0.0))
         is_sold = open_contract.get("is_sold") == 1
+        is_expired = open_contract.get("is_expired") == 1 or open_contract.get("is_expired") is True
         status = open_contract.get("status")
 
         # Check if the contract is concluded
-        if is_sold or status in ["won", "lost", "sold"]:
+        if is_sold or is_expired or status in ["won", "lost", "sold"]:
             final_pnl = float(open_contract.get("profit", 0.0))
-            logger.info(f"Position concluded. Contract: {contract_id}, Result PnL: ${final_pnl:.2f}")
+            logger.info(f"[CONTRACT CLOSED BY SERVER] Contract: {contract_id}, Result PnL: ${final_pnl:.2f}")
             
             # Update metrics and write to CSV
             self._process_trade_outcome(contract_id, final_pnl)
@@ -433,13 +434,22 @@ class ScalperBotApp:
             if success:
                 self.last_sent_server_sl = server_sl_usd
 
-
-
-        if should_sell:
+        # Server SL Isolation: Do NOT send manual Python WebSocket sell requests when current_sl_floor < 0.00.
+        # Allow Deriv's native server-side stop-loss payload to execute the initial hard stop loss.
+        # Python manual sell commands must ONLY fire when ratcheted into Break-Even or Profit Lock (current_sl_floor >= 0.00).
+        if should_sell and current_sl_floor >= 0.00:
             logger.warning(f"SL Floor Hit ({current_pnl:.2f} <= {current_sl_floor:.2f}). Selling contract immediately...")
-            closed = await self._close_position_api(contract_id)
-            if not closed:
-                logger.error(f"Manual market close failed for contract {contract_id}!")
+            res = await self._close_position_api(contract_id)
+            if res != "OK":
+                if "expired" in res.lower() or "not found" in res.lower():
+                    logger.warning(f"[CONTRACT CLOSED BY SERVER] Sell rejected because contract already concluded. Cleaning up state.")
+                    # Conclude the position immediately!
+                    self._process_trade_outcome(contract_id, current_pnl)
+                    self._clear_active_trade_state()
+                    self.active_trade = None
+                else:
+                    logger.error(f"Manual market close failed for contract {contract_id}!")
+
 
     async def _subscribe_open_contract_api(self, contract_id: str) -> bool:
         """
@@ -484,7 +494,7 @@ class ScalperBotApp:
             logger.error(f"Error updating stop-loss on server: {e}")
             return False
 
-    async def _close_position_api(self, contract_id: str) -> bool:
+    async def _close_position_api(self, contract_id: str) -> str:
 
         """
         Issues market close command for contract.
@@ -496,13 +506,15 @@ class ScalperBotApp:
         try:
             response = await self.client.send_request(payload)
             if "error" in response:
-                logger.error(f"Failed to close contract {contract_id}: {response['error'].get('message')}")
-                return False
+                error_msg = response["error"].get("message", "")
+                logger.error(f"Failed to close contract {contract_id}: {error_msg}")
+                return error_msg
             logger.info(f"Contract {contract_id} closed successfully via API.")
-            return True
+            return "OK"
         except Exception as e:
             logger.error(f"Error closing position via API: {e}")
-            return False
+            return str(e)
+
 
     def _process_trade_outcome(self, contract_id: str, final_pnl: float):
         """
@@ -519,7 +531,8 @@ class ScalperBotApp:
             self.consecutive_losses += 1
             self.cumulative_daily_loss += abs(final_pnl)  # Add loss amount to tracking
             self.cooldown_until = time.time() + config.COOLDOWN_AFTER_LOSS_SECONDS
-            logger.warning(f"Trade lost. Enforcing 10-Minute Loss Quarantine ({config.COOLDOWN_AFTER_LOSS_SECONDS}s cooldown).")
+            logger.warning(f"Trade lost. Enforcing Loss Quarantine ({config.COOLDOWN_AFTER_LOSS_SECONDS}s cooldown).")
+
 
         # Log to CSV
         log_file = "trading_log.csv"

@@ -42,7 +42,8 @@ TRAILING_STEP_USD = 0.25  # Incremental step threshold for SL floor moves
 
 # Safety Cooldowns & Circuit Breakers
 COOLDOWN_AFTER_WIN_SECONDS = 30  # Standard 1-candle wait after winning trade
-COOLDOWN_AFTER_LOSS_SECONDS = 180  # Reduced to 3 minutes for faster market re-entry
+COOLDOWN_AFTER_LOSS_SECONDS = 600  # Enforce 10-minute loss quarantine
+
 MAX_CONSECUTIVE_LOSSES = 4  # Emergency halt after 4 consecutive losses
 
 MAX_DAILY_LOSS_USD = 3.00  # Emergency halt on $3.00 total session loss
