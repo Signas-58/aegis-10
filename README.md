@@ -38,7 +38,8 @@ The bot executes a top-down Multi-Timeframe (15m / 5m / 1m) Smart Money & Liquid
     - Shifts stop floor to `+$0.25` (Locks in profit) once peak PnL reaches `+$0.75`.
   - *Phase 2 (Continuous Trail above $1.00)*:
     - Once peak PnL reaches `+$1.00`, stop floor trails continuously cent-by-cent exactly `-$0.50` behind peak PnL (`peak_pnl - 0.50`).
-  - *Server-Side Sync Safeguard*: Updates are transmitted in real time to the Deriv server using `contract_update`. If in profit (where positive stops are invalid on the server), it clamps at `$0.01` risk to guarantee break-even protection in case of bot dropouts.
+  - *Server-Side Sync Safeguard*: Updates are transmitted in real time to the Deriv server using `contract_update`. If in profit (where positive stops are invalid on the server), it clamps at `$0.10` risk (the minimum limit supported by the Deriv API) to guarantee near-break-even protection in case of bot dropouts.
+
 
 - **System Circuit Breakers & Cooldowns**:
   - Standard Win Cooldown: Standard 30-second pause after winning trade.

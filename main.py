@@ -426,12 +426,13 @@ class ScalperBotApp:
 
         # Update the server-side Stop-Loss limit dynamically as the floor rises
         # If floor is negative (Phase 1/entry), server risk is -floor.
-        # If floor is >= 0, server risk is set to 0.01 (minimum possible break-even risk on server).
-        server_sl_usd = round(max(0.01, -current_sl_floor), 2)
+        # If floor is >= 0, server risk is set to 0.10 (minimum possible break-even risk on server).
+        server_sl_usd = round(max(0.10, -current_sl_floor), 2)
         if server_sl_usd != self.last_sent_server_sl:
             success = await self._update_contract_stop_loss_api(contract_id, server_sl_usd)
             if success:
                 self.last_sent_server_sl = server_sl_usd
+
 
 
         if should_sell:

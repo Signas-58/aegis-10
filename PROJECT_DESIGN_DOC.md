@@ -83,7 +83,8 @@ A signal must sequentially pass all five logic layers to trigger entry:
 - **Stage 2 (Continuous Trailing Phase)**:
   - Once peak PnL reaches `+$1.00` or above, the stop-loss floor trails exactly `-$0.50` behind peak PnL (e.g. `peak_pnl - 0.50` on a continuous cent-by-cent basis).
 - **Execution**: Issue immediate market close command if PnL drops to or below the current stop-loss floor.
-- **Server-Side Sync Safeguard**: To prevent losses due to connection dropout or bot latency, the bot syncs the updated stop-loss limits to the Deriv servers in real time using the `contract_update` API. For profit-locking levels (where positive stops are rejected by the API), the server stop-loss is set to `$0.01` to guarantee break-even protection.
+- **Server-Side Sync Safeguard**: To prevent losses due to connection dropout or bot latency, the bot syncs the updated stop-loss limits to the Deriv servers in real time using the `contract_update` API. For profit-locking levels (where positive stops are rejected by the API), the server stop-loss is set to `$0.10` (the minimum limit supported by the Deriv API) to guarantee near-break-even protection.
+
 
 
 
