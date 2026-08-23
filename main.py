@@ -44,6 +44,8 @@ class ScalperBotApp:
         self.shutdown_pending = False
         self.running = True
         self.cooldown_until = 0.0
+        self.last_sent_server_sl = config.HARD_STOP_LOSS_USD
+
 
     async def run(self):
         """
@@ -370,6 +372,8 @@ class ScalperBotApp:
             }
             self._save_active_trade_state()
             self.ratchet_engine.reset()
+            self.last_sent_server_sl = config.HARD_STOP_LOSS_USD
+
 
             # 4. Subscribe to position updates
             await self._subscribe_open_contract_api(contract_id)
@@ -420,6 +424,16 @@ class ScalperBotApp:
 
         logger.info(f"Contract {contract_id} status: PnL: ${current_pnl:.2f} | Peak: ${self.ratchet_engine.peak_pnl:.2f} | SL Floor: ${current_sl_floor:.2f}")
 
+        # Update the server-side Stop-Loss limit dynamically as the floor rises
+        # If floor is negative (Phase 1/entry), server risk is -floor.
+        # If floor is >= 0, server risk is set to 0.01 (minimum possible break-even risk on server).
+        server_sl_usd = round(max(0.01, -current_sl_floor), 2)
+        if server_sl_usd != self.last_sent_server_sl:
+            success = await self._update_contract_stop_loss_api(contract_id, server_sl_usd)
+            if success:
+                self.last_sent_server_sl = server_sl_usd
+
+
         if should_sell:
             logger.warning(f"SL Floor Hit ({current_pnl:.2f} <= {current_sl_floor:.2f}). Selling contract immediately...")
             closed = await self._close_position_api(contract_id)
@@ -446,7 +460,31 @@ class ScalperBotApp:
             logger.error(f"Error subscribing to contract updates: {e}")
             return False
 
+    async def _update_contract_stop_loss_api(self, contract_id: str, stop_loss_usd: float) -> bool:
+        """
+        Sends contract_update payload to update stop-loss on the server side.
+        """
+        payload = {
+            "contract_update": 1,
+            "contract_id": int(contract_id),
+            "limit_order": {
+                "stop_loss": stop_loss_usd
+            }
+        }
+        try:
+            logger.info(f"Sending server-side stop-loss update for contract {contract_id} to ${stop_loss_usd:.2f}...")
+            response = await self.client.send_request(payload)
+            if "error" in response:
+                logger.error(f"Failed to update stop-loss on server: {response['error'].get('message')}")
+                return False
+            logger.info(f"Server-side stop-loss updated successfully for contract {contract_id}.")
+            return True
+        except Exception as e:
+            logger.error(f"Error updating stop-loss on server: {e}")
+            return False
+
     async def _close_position_api(self, contract_id: str) -> bool:
+
         """
         Issues market close command for contract.
         """
