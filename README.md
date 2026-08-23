@@ -5,8 +5,8 @@
 </p>
 
 <p align="center">
-  <strong>Version: 0.9.5-beta</strong><br>
-  <em>Status: Pre-Production / Dev</em>
+  <strong>Version: 0.9.8-mtf</strong><br>
+  <em>Status: Pre-Production / Dev (Smart Money & MTF Upgrades)</em>
 </p>
 
 ---
@@ -15,21 +15,30 @@
 
 **Aegis-10** is an automated algorithmic trading bot designed to scalp low-volatility synthetic indices (`R_25`) via the official Deriv WebSocket API. 
 
-
-The bot targets trend-following trade signals using Multiplier contracts, optimized specifically for small account balances ($20.00 initial capital) using native server protection limits, an uncapped dynamic trailing profit ratchet engine, and strict daily risk controls.
+The bot executes a top-down Multi-Timeframe (15m / 5m / 1m) Smart Money & Liquidity strategy utilizing trend filters, ADX volatility safeguards, key HTF level mappings, sell-side/buy-side liquidity sweep detections, and a post-loss quarantine system.
 
 ---
 
 ## Core Specifications & Features
 
-- **Trading Strategy**: 1-Minute timeframe charting (granularity: 60) using a 20-period EMA for trend filtering and a 14-period RSI for momentum crossovers at the 50 level.
-- **Capital Protection**: Native server-side Stop-Loss set at `$0.75 USD` per trade.
-- **Uncapped Dynamic Trailing Engine**: 
-  - *Break-Even*: Shifts stop floor to `$0.00` when PnL $\ge$ `+$0.50`.
-  - *Dynamic Trailing*: Stop floor trails exactly `$0.50` behind peak PnL once peak PnL $\ge$ `+$1.00`.
-- **System Circuit Breakers**: Halts operations immediately if **consecutive losses $\ge$ 4** or **cumulative daily loss $\ge$ $3.00 USD**.
-- **Session Limits**: An 8-hour maximum runtime (`MAX_RUNTIME_MINUTES = 480`) with graceful shutdown to manage existing positions.
-- **Connection Reliability**: 15-second heartbeat pinging, dynamic REST-based OTP token generation, and robust crash recovery using local state persistence (`active_trade.json`).
+- **Multi-Timeframe Structure**:
+  - *Macro Buffer (15m)*: Used for trend direction gates and swing high/low key level mappings.
+  - *Structure Buffer (5m)*: Used for ADX trend strength filtering and liquidity sweep detection.
+  - *Trigger Buffer (1m)*: Precision entry execution signals.
+- **Top-Down 5-Layer Confluence Engine**:
+  1. **EMA Trend Gate (15m)**: Calculates EMA-200 to enforce macro trend direction (`MULTUP` / `MULTDOWN`).
+  2. **ADX Volatility Gate (5m)**: Calculated over a 14-period window. Blocks all execution if `ADX < 22` to avoid sideways market consolidation.
+  3. **Proximity Guard (15m)**: Blocks entries if current spot price is within `$0.50 USD` of HTF support/resistance levels.
+  4. **Liquidity Sweep Detection (5m)**: Detects sell-side/buy-side liquidity sweeps when candles wick past HTF support/resistance but close back inside the range.
+  5. **Precision Entry Trigger (1m)**: Enforces entry when the price closes above/below 1m EMA-20 and 1m RSI-14 crossed the 50 level.
+- **Dynamic Ratchet Trailing Engine**:
+  - *Break-Even*: Shifts stop floor to `$0.00` once peak PnL reaches `+$0.50`.
+  - *Dynamic Trailing*: Stop floor trails exactly `-$0.50` behind peak PnL once peak PnL reaches `+$1.00`.
+- **System Circuit Breakers & Cooldowns**:
+  - Standard Win Cooldown: Standard 30-second pause after winning trade.
+  - **10-Minute Loss Quarantine (`600s`)**: Active immediately after any losing trade to let hostile market conditions clear.
+  - Max limits: Emergency halt on 4 consecutive losses or `$3.00` daily cap.
+  - Session Limit: Max 8 hours runtime countdown (`MAX_RUNTIME_MINUTES = 480`).
 
 ---
 
@@ -39,7 +48,8 @@ The bot targets trend-following trade signals using Multiplier contracts, optimi
 aegis-10/
 ├── config.py             # System parameters & risk thresholds
 ├── main.py               # Orchestrator, connection handlers, and trade state recovery
-├── engine.py             # Technical indicators & trailing stop ratchet logic
+├── strat.py              # Technical indicators & multi-timeframe signal filters
+├── engine.py             # Trailing stop ratchet calculator
 ├── websocket_client.py   # OTP WebSocket connection handshake client
 ├── active_trade.json     # Dynamic crash recovery state persistence
 └── trading_log.csv       # Completed trade logs
@@ -64,13 +74,6 @@ aegis-10/
    ```powershell
    python main.py
    ```
+   *Windows Feature: Running python main.py automatically pops open a new Command Prompt window displaying the trade stream, exiting the background console cleanly.*
 4. **Graceful Shutdown**:
-   Press **`Ctrl + C`** in your terminal at any time. The bot will automatically execute a market close order on any open trade before disconnecting and exiting.
-
----
-
-## Repository Documentation
-
-- 📘 **[Project Design & Technical Plan](file:///c:/Workspace/aegis-10/PROJECT_DESIGN_DOC.md)**: Detailed specifications, system architecture, strategy logic, and risk controls.
-- 🔌 **[Deriv WebSocket API Protocol Reference](file:///c:/Workspace/aegis-10/DERIV_API_DOCS.md)**: JSON payloads, request/response tracking schemas, and endpoints.
-- 🗺️ **[Implementation & Testing Roadmap](file:///c:/Workspace/aegis-10/ROADMAP.md)**: Milestone deliverables from foundation layout to paper testing and live execution.
+   Press **`Ctrl + C`** in your visible Command Prompt window at any time. The bot will automatically execute a market close order on any open trade before disconnecting and exiting.
