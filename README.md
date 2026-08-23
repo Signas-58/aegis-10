@@ -33,8 +33,12 @@ The bot executes a top-down Multi-Timeframe (15m / 5m / 1m) Smart Money & Liquid
   5. **Precision Entry Trigger (1m)**: Enforces entry when the 1m price crosses EMA-20 with RSI-14 > 50, OR when a corresponding 5m liquidity sweep is active.
 
 - **Dynamic Ratchet Trailing Engine**:
-  - *Break-Even*: Shifts stop floor to `$0.00` once peak PnL reaches `+$0.50`.
-  - *Dynamic Trailing*: Stop floor trails exactly `-$0.50` behind peak PnL once peak PnL reaches `+$1.00`.
+  - *Phase 1 (Stepped Floor under $1.00)*:
+    - Shifts stop floor to `$0.00` (Break-Even) once peak PnL reaches `+$0.50`.
+    - Shifts stop floor to `+$0.25` (Locks in profit) once peak PnL reaches `+$0.75`.
+  - *Phase 2 (Continuous Trail above $1.00)*:
+    - Once peak PnL reaches `+$1.00`, stop floor trails continuously cent-by-cent exactly `-$0.50` behind peak PnL (`peak_pnl - 0.50`).
+
 - **System Circuit Breakers & Cooldowns**:
   - Standard Win Cooldown: Standard 30-second pause after winning trade.
   - **3-Minute Loss Quarantine (`180s`)**: Active immediately after any losing trade to let hostile market conditions clear.
