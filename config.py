@@ -16,8 +16,10 @@ IS_DEMO = True  # Hard safety limit
 SYMBOL = "R_25"  # Volatility 25 Index
 CONTRACT_TYPE_UP = "MULTUP"
 CONTRACT_TYPE_DOWN = "MULTDOWN"
+MULTIPLIER = 400  # Default Multiplier Factor (Accepts 400, 1000, 2000, 3000, 4000)
 
 # Multi-Timeframe Ingestion Settings
+
 TF_MACRO = 900  # 15-Minute Candles (Macro Horizon)
 TF_STRUCTURE = 300  # 5-Minute Candles (Structure & Liquidity Horizon)
 TF_TRIGGER = 60  # 1-Minute Candles (Precision Trigger Horizon)
