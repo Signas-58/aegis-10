@@ -77,9 +77,13 @@ A signal must sequentially pass all five logic layers to trigger entry:
 
 ### Trailing Stop-Loss Floor Ratchet Engine
 - **Stage 0 (Entry)**: Native server Stop-Loss at -$0.75.
-- **Stage 1 (Break-Even)**: Shift floor to `$0.00` once peak PnL reaches `+$0.50`.
-- **Stage 2 (Dynamic Trail)**: Floor trails exactly `-$0.50` behind peak PnL once peak PnL reaches `+$1.00`.
+- **Stage 1 (Step-Ladder Phase)**:
+  - Shift floor to `$0.00` once peak PnL reaches `+$0.50` (Break-Even).
+  - Shift floor to `+$0.25` once peak PnL reaches `+$0.75` (Locks in $0.25 profit).
+- **Stage 2 (Continuous Trailing Phase)**:
+  - Once peak PnL reaches `+$1.00` or above, the stop-loss floor trails exactly `-$0.50` behind peak PnL (e.g. `peak_pnl - 0.50` on a continuous cent-by-cent basis).
 - **Execution**: Issue immediate market close command if PnL drops to or below the current stop-loss floor.
+
 
 ### System Circuit Breakers
 - **Daily Drawdown Cap**: Terminate program if total cumulative daily loss reaches `$3.00 USD`.

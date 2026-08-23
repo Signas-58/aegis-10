@@ -35,9 +35,10 @@ STAKE = 1.00  # Deriv Multipliers API minimum requirement
 HARD_STOP_LOSS_USD = 0.75  # Native Deriv Server-Side Stop Loss Limit
 TAKE_PROFIT_USD = None  # UNCAPPED Profit potential
 
-BREAK_EVEN_TRIGGER = 0.50  # Shift internal SL floor to $0.00 at +$0.50 PnL
-DYNAMIC_TRAIL_START = 1.00  # Enable dynamic continuous trailing at +$1.00 PnL
-TRAILING_OFFSET_USD = 0.50  # SL floor trails $0.50 behind peak PnL
+# Trailing Stop-Loss Step Ladder Mechanics
+TRAILING_GAP_USD = 0.50  # Distance maintained behind peak PnL
+TRAILING_STEP_USD = 0.25  # Incremental step threshold for SL floor moves
+
 
 # Safety Cooldowns & Circuit Breakers
 COOLDOWN_AFTER_WIN_SECONDS = 30  # Standard 1-candle wait after winning trade

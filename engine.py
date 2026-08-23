@@ -28,19 +28,24 @@ class TrailingRatchetEngine:
         if current_pnl > self.peak_pnl:
             self.peak_pnl = current_pnl
 
-        # Stage 1: Break-Even Lock
-        if self.peak_pnl >= config.BREAK_EVEN_TRIGGER and self.current_sl_floor < 0.00:
-            self.current_sl_floor = 0.00
-            logger.info(f"[RATC_ENG] Peak PnL reached {self.peak_pnl:.2f}. SL Floor Shifted to Break-Even ($0.00)")
+        # Phase 1: Step-Ladder Floor when peak PnL is below $1.00
+        if self.peak_pnl < 1.00:
+            if self.peak_pnl >= 0.75:
+                calculated_floor = 0.25
+            elif self.peak_pnl >= 0.50:
+                calculated_floor = 0.00
+            else:
+                calculated_floor = -config.HARD_STOP_LOSS_USD
+        else:
+            # Phase 2: Continuous Trailing once peak PnL is >= $1.00 (Gap of $0.50)
+            calculated_floor = self.peak_pnl - config.TRAILING_GAP_USD
 
-        # Stage 2: Dynamic Continuous Trailing (Uncapped Profit Engine)
-        if self.peak_pnl >= config.DYNAMIC_TRAIL_START:
-            calculated_floor = self.peak_pnl - config.TRAILING_OFFSET_USD
-            # One-Way Ratchet Rule: Floor can ONLY increase, never decrease
-            if calculated_floor > self.current_sl_floor:
-                self.current_sl_floor = calculated_floor
-                logger.info(f"[RATC_ENG] SL Floor Shifted Upwards to +${self.current_sl_floor:.2f} (Peak PnL: {self.peak_pnl:.2f})")
+        # One-Way Ratchet Rule: Floor can ONLY increase, never decrease
+        if calculated_floor > self.current_sl_floor:
+            self.current_sl_floor = calculated_floor
+            logger.info(f"[RATC_ENG] SL Floor Shifted Upwards to +${self.current_sl_floor:.2f} (Peak PnL: {self.peak_pnl:.2f})")
 
         # Stage 3: Execution Trigger Check
         should_sell = current_pnl <= self.current_sl_floor
         return self.current_sl_floor, should_sell
+
